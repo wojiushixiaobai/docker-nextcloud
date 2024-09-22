@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:alpine
+    restart: always
+    volumes:
+      - ./data/postgresql/data:/var/lib/postgresql/data:z
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-nextcloud}
+      - POSTGRES_USER=${POSTGRES_USER:-nextcloud}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?error}
+    env_file:
+      - .env
+
+  redis:
+    image: redis:alpine
+    restart: always
+
+  app:
+    image: nextcloud:fpm-alpine
+    restart: always
+    volumes:
+      - ./data/nextcloud:/var/www/html:z
+    environment:
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - POSTGRES_DB=${POSTGRES_DB:-nextcloud}
+      - POSTGRES_USER=${POSTGRES_USER:-nextcloud}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?error}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER:-admin}
+      - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD:?error}
+      - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_TRUSTED_DOMAINS:-localhost}
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
+  web:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - ${HTTP_PORT:-8080}:80/tcp
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/nextcloud:/var/www/html:z,ro
+    depends_on:
+      - app
+
+  cron:
+    image: nextcloud:fpm-alpine
+    restart: always
+    volumes:
+      - ./data/nextcloud:/var/www/html:z
+    entrypoint: /cron.sh
+    depends_on:
+      - db
+      - redis

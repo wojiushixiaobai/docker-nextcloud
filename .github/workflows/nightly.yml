@@ -1,0 +1,24 @@
+on:
+  schedule:
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+
+name: Auto Update for nightly
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update Nextcloud
+        run: |
+          wget -O nginx/nginx.conf.new https://github.com/nextcloud/docker/raw/refs/heads/master/.examples/docker-compose/insecure/postgres/fpm/web/nginx.conf || exit 1
+          if ! diff -q nginx/nginx.conf nginx/nginx.conf.new; then
+            rm -f nginx/nginx.conf
+            mv nginx/nginx.conf.new nginx/nginx.conf
+            git add .
+            git commit -m "Update nginx.conf for $(date +%Y-%m-%d)"
+            git push origin HEAD
+          fi
